@@ -84,6 +84,12 @@ class CheckGraphiteData < Sensu::Plugin::Check::CLI
     :long => '--from FROM',
     :default => "-10mins"
 
+  option :timeout,
+    :description => 'How long to wait for connecting to graphite (default: 30 seconds)',
+    :short => '-t TIMEOUT',
+    :long => '--timeout TIMEOUT',
+    :default => 30
+
   option :help,
     :description => 'Show this message',
     :short => '-h',
@@ -124,9 +130,9 @@ class CheckGraphiteData < Sensu::Plugin::Check::CLI
           elsif config[:password]
             pass = config[:password]
           end
-          handle = open(url, :http_basic_authentication =>["#{config[:username]}", pass.chomp], :read_timeout => 30)
+          handle = open(url, :http_basic_authentication =>["#{config[:username]}", pass.chomp], :read_timeout => config[:timeout])
         else # we don't have both username and password trying without
-          handle = open(url, :read_timeout => 30)
+          handle = open(url, :read_timeout => config[:timeout])
         end
 
         @raw_data = JSON.parse(handle.gets).first

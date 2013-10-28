@@ -88,7 +88,7 @@ class CheckGraphiteData < Sensu::Plugin::Check::CLI
     :description => 'How long to wait for connecting to graphite (default: 30 seconds)',
     :short => '-i TIMEOUT',
     :long => '--timeout TIMEOUT',
-    :default => 30,
+    :default => 30
 
   option :help,
     :description => 'Show this message',

@@ -32,6 +32,12 @@ class CurlMetrics < Sensu::Plugin::Metric::CLI::Graphite
     :description => 'Additional arguments to pass to curl',
     :default => ''
 
+  option :timeout,
+    :short => '-t "max-time"',
+    :long => '--timeout "max-time"',
+    :description => 'timeout for the hole operation',
+    :default => 30
+
   option :scheme,
     :description => "Metric naming scheme, text to prepend to metric",
     :short => "-s SCHEME",
@@ -40,7 +46,7 @@ class CurlMetrics < Sensu::Plugin::Metric::CLI::Graphite
     :default => "#{Socket.gethostname}.curl_timings"
 
   def run
-    cmd = "curl --silent --output /dev/null #{config[:curl_args]} "
+    cmd = "curl --silent --max-time #{config[:timeout]} --output /dev/null #{config[:curl_args]} "
     cmd += '-w "%{time_total},%{time_namelookup},%{time_connect},%{time_pretransfer},%{time_redirect},%{time_starttransfer}" '
     cmd += config[:url]
 

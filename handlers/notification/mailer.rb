@@ -46,6 +46,7 @@ class Mailer < Sensu::Handler
             Command:  #{@event['check']['command']}
             Status:  #{@event['check']['status']}
             Occurrences:  #{@event['occurrences']}
+            Todo:  #{@event['check']['todo']}
             #{playbook}
           BODY
     subject = "#{action_to_string} - #{short_name}: #{@event['check']['notification']}"

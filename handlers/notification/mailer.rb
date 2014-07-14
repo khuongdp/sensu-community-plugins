@@ -15,6 +15,18 @@ gem 'mail', '~> 2.5.4'
 require 'mail'
 require 'timeout'
 
+# patch to fix Exim delivery_method: https://github.com/mikel/mail/pull/546
+module ::Mail
+  class Exim < Sendmail
+    def self.call(path, arguments, destinations, encoded_message)
+      popen "#{path} #{arguments}" do |io|
+        io.puts encoded_message.to_lf
+        io.flush
+      end
+    end
+  end
+end
+
 class Mailer < Sensu::Handler
   def short_name
     @event['client']['name'] + '/' + @event['check']['name']
@@ -24,8 +36,21 @@ class Mailer < Sensu::Handler
    @event['action'].eql?('resolve') ? "RESOLVED" : "ALERT"
   end
 
-  def handle
+  def build_mail_to_list
     mail_to = settings['mailer']['mail_to']
+    if settings['mailer'].has_key?('subscriptions')
+      @event['check']['subscribers'].each do |sub|
+        if settings['mailer']['subscriptions'].has_key?(sub)
+          mail_to << ", #{settings['mailer']['subscriptions'][sub]['mail_to']}"
+        end
+      end
+    end
+    mail_to
+  end
+
+  def handle
+    admin_gui = settings['mailer']['admin_gui'] || 'http://localhost:8080/'
+    mail_to = build_mail_to_list
     mail_from =  settings['mailer']['mail_from']
 
     delivery_method = settings['mailer']['delivery_method'] || 'smtp'
@@ -41,6 +66,7 @@ class Mailer < Sensu::Handler
     playbook = "Playbook:  #{@event['check']['playbook']}" if @event['check']['playbook']
     body = <<-BODY.gsub(/^\s+/, '')
             #{@event['check']['output']}
+            Admin GUI: #{admin_gui}
             Host: #{@event['client']['name']}
             Timestamp: #{Time.at(@event['check']['issued'])}
             Address:  #{@event['client']['address']}

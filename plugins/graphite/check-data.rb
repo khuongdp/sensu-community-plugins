@@ -159,9 +159,10 @@ class CheckGraphiteData < Sensu::Plugin::Check::CLI
           end
 
           url_opts[:http_basic_authentication] = [config[:username], pass.chomp]
+	  url_opts[:read_timeout] = config[:timeout]
         end # we don't have both username and password trying without
 
-        handle = open(url, url_opts, :read_timeout => config[:timeout])
+        handle = open(url, url_opts)
 
         @raw_data = JSON.parse(handle.gets)
         output = {}

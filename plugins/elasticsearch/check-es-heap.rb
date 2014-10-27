@@ -28,11 +28,18 @@ require 'json'
 
 class ESHeap < Sensu::Plugin::Check::CLI
 
-  option :server,
-    :description => 'Elasticsearch server',
-    :short => '-s SERVER',
-    :long => '--server SERVER',
+  option :host,
+    :description => 'Elasticsearch host',
+    :short => '-h HOST',
+    :long => '--host HOST',
     :default => 'localhost'
+
+  option :port,
+    :description => 'Elasticsearch port',
+    :short => '-p PORT',
+    :long => '--port PORT',
+    :proc => proc {|a| a.to_i },
+    :default => 9200
 
   option :warn,
     :short => '-w N',
@@ -41,19 +48,19 @@ class ESHeap < Sensu::Plugin::Check::CLI
     :proc => proc {|a| a.to_i },
     :default => 0
 
+  option :timeout,
+    :description => 'Sets the connection timeout for REST client',
+    :short => '-t SECS',
+    :long => '--timeout SECS',
+    :proc => proc {|a| a.to_i },
+    :default => 30
+
   option :crit,
     :short => '-c N',
     :long => '--crit N',
     :description => 'Heap used in bytes CRITICAL threshold',
     :proc => proc {|a| a.to_i },
     :default => 0
-
-  option :port,
-    :short => '-p N',
-    :long => '--port N',
-    :description => "Specify port used",
-    :proc => proc {|a| a.to_i },
-    :default => 9200
 
   def get_es_version
     info = get_es_resource('/')
@@ -62,7 +69,7 @@ class ESHeap < Sensu::Plugin::Check::CLI
 
   def get_es_resource(resource)
     begin
-      r = RestClient::Resource.new("http://#{config[:server]}:#{config[:port]}/#{resource}", :timeout => 45)
+      r = RestClient::Resource.new("http://#{config[:host]}:#{config[:port]}/#{resource}", :timeout => config[:timeout])
       JSON.parse(r.get)
     rescue Errno::ECONNREFUSED
       warning 'Connection refused'

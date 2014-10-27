@@ -82,6 +82,13 @@ class Graphite < Sensu::Plugin::Check::CLI
          :default => false,
          :boolean => true
 
+  option :short_output,
+         :description => "Report only the highest status per series in output",
+         :short => "-s",
+         :long => "--short_output",
+         :default => false,
+         :boolean => true
+
   option :check_average,
          :description => "MAX_VALUE should be greater than the average of Graphite values from PERIOD",
          :short => "-a MAX_VALUE",
@@ -106,6 +113,18 @@ class Graphite < Sensu::Plugin::Check::CLI
   option :check_percentile,
          :description => "Values should not be greater than the VALUE of Graphite values from PERIOD",
          :long => "--percentile_value VALUE"
+
+  option :http_user,
+         :description => "Basic HTTP authentication user",
+         :short => "-U USER",
+         :long => "--http-user USER",
+         :default => nil
+
+  option :http_password,
+         :description => "Basic HTTP authentication password",
+         :short => "-P PASSWORD",
+         :long => "--http-password USER",
+         :default => nil
 
   def initialize
     super
@@ -148,7 +167,16 @@ class Graphite < Sensu::Plugin::Check::CLI
         :from   => "-#{@period.to_s}",
         :format => 'json'
     }
-    resp = Net::HTTP.post_form(graphite_url, params)
+
+    req = Net::HTTP::Post.new(graphite_url.path)
+
+    # If the basic http authentication credentials have been provided, then use them
+    if !config[:http_user].nil? && !config[:http_password].nil?
+      req.basic_auth(config[:http_user], config[:http_password])
+    end
+
+    req.set_form_data(params)
+    resp = Net::HTTP.new(graphite_url.host, graphite_url.port).start { |http| http.request(req) }
     data = JSON.parse(resp.body)
     @graphite_cache[target] = []
     if data.size > 0
@@ -279,7 +307,9 @@ class Graphite < Sensu::Plugin::Check::CLI
       avg_value = values_array.inject{ |sum, el| sum + el if el }.to_f / values_array.size
       last_value = last_values[target]
       percent = last_value / avg_value unless last_value.nil? || avg_value.nil?
-      max_values.each_pair do |type, max_value|
+      ['fatal', 'error', 'warning'].each do |type|
+        next unless max_values.has_key?(type)
+        max_value = max_values[type]
         var1 = config[:greater_than] ? percent : max_value.to_f
         var2 = config[:greater_than] ? max_value.to_f : percent
         if !percent.nil? && var1 > var2 && (values_array.size > 0 || !config[:ignore_nulls])
@@ -294,6 +324,7 @@ class Graphite < Sensu::Plugin::Check::CLI
           else
             raise "Unknown type #{type}"
           end
+          break if config[:short_output]
         end
       end
     end
@@ -311,7 +342,9 @@ class Graphite < Sensu::Plugin::Check::CLI
       values_pair = data[:datapoints]
       values_array = values_pair.find_all{|v| v.first}.map {|v| v.first if v.first != nil}
       avg_value = values_array.inject{ |sum, el| sum + el if el }.to_f / values_array.size
-      max_values.each_pair do |type, max_value|
+      ['fatal', 'error', 'warning'].each do |type|
+        next unless max_values.has_key?(type)
+        max_value = max_values[type]
         var1 = config[:greater_than] ? avg_value : max_value.to_f
         var2 = config[:greater_than] ? max_value.to_f : avg_value
         if var1 > var2 && (values_array.size > 0 || !config[:ignore_nulls])
@@ -326,6 +359,7 @@ class Graphite < Sensu::Plugin::Check::CLI
           else
             raise "Unknown type #{type}"
           end
+          break if config[:short_output]
         end
       end
     end
@@ -346,7 +380,9 @@ class Graphite < Sensu::Plugin::Check::CLI
       percentile_value = values_array.percentile(percentile)
       last_value = last_values[target]
       percent = last_value / percentile_value unless last_value.nil? || percentile_value.nil?
-      max_values.each_pair do |type, max_value|
+      ['fatal', 'error', 'warning'].each do |type|
+        next unless max_values.has_key?(type)
+        max_value = max_values[type]
         var1 = config[:greater_than] ? percent : max_value.to_f
         var2 = config[:greater_than] ? max_value.to_f : percent
         if !percentile_value.nil? && var1 > var2
@@ -362,6 +398,7 @@ class Graphite < Sensu::Plugin::Check::CLI
           else
             raise "Unknown type #{type}"
           end
+          break if config[:short_output]
         end
       end
     end
@@ -377,10 +414,12 @@ class Graphite < Sensu::Plugin::Check::CLI
     last_targets.each do | target_name, last |
       last_value = last.first
       unless last_value.nil?
-        max_values.each_pair do |type, max_value|
+        ['fatal', 'error', 'warning'].each do |type|
+          next unless max_values.has_key?(type)
+          max_value = max_values[type]
           var1 = config[:greater_than] ? last_value : max_value.to_f
           var2 = config[:greater_than] ? max_value.to_f : last_value
-          if  var1 > var2
+          if var1 > var2
             text = "The metric #{target_name} is #{last_value} that is #{greater_less} than max allowed #{max_value}"
             case type
             when "warning"
@@ -392,6 +431,7 @@ class Graphite < Sensu::Plugin::Check::CLI
             else
               raise "Unknown type #{type}"
             end
+            break if config[:short_output]
           end
         end
       end

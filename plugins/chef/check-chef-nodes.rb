@@ -3,9 +3,15 @@
 # Check Chef nodes
 # ===
 #
+# Example
+# ------
+#
+# Look for nodes that haven't check in for 1 or more hours
+#
+# ./check-chef-nodes.rb -t 3600 -U https://api.opscode.com/organizations/<org> -K /path/to/org.pem
+#
 # It will report you nodes from you cluster last seen more then some amount of seconds
 # Set CRITICAL-TIMESPAN to something interval + splay + <average chef kitchen run time>
-# Copyright 2014 SUSE, GmbH <happy-customer@suse.de>
 # Released under the same terms as Sensu (the MIT license); see LICENSE
 # for details.
 
@@ -44,7 +50,7 @@ class ChefNodesStatusChecker < Sensu::Plugin::Check::CLI
     nodes = connection.get_rest('/nodes')
     nodes.keys.map do |node_name|
       node = connection.get_rest("/nodes/#{node_name}")
-      { node_name => (Time.now - Time.at(node.ohai_time)) > config[:critical_timespan].to_i }
+      { node_name => (Time.now - Time.at(node["ohai_time"])) > config[:critical_timespan].to_i }
     end
   end
 
@@ -53,7 +59,7 @@ class ChefNodesStatusChecker < Sensu::Plugin::Check::CLI
     if any_node_stuck?
       ok 'Chef Server API is ok, all nodes reporting'
     else
-      critical "Those nodes cannot be provisioned: #{failed_nodes_names}"
+      critical "The following nodes cannot be provisioned: #{failed_nodes_names}"
     end
 
   end

@@ -1,6 +1,7 @@
 language: ruby
 rvm:
+  - 2.0
   - 2.1
 script:
-  - 'bundle exec rubocop --config .rubocop.yml'
+  - 'bundle exec rake rubocop'
   - 'bundle exec rake spec'

@@ -104,6 +104,12 @@ class CheckProcs < Sensu::Plugin::Check::CLI
     :description => 'Trigger on a Proportional Set Size is bigger than this',
     :proc => proc {|a| a.to_f }
 
+  option :thcount,
+    :short => '-T THCOUNT',
+    :long => '--thread-count THCOUNT',
+    :description => 'Trigger on a Thread Count is bigger than this',
+    :proc => proc {|a| a.to_i }
+
   option :state,
     :short => '-s STATE',
     :long => '--state STATE',
@@ -175,8 +181,8 @@ class CheckProcs < Sensu::Plugin::Check::CLI
         line_to_hash(line, :pid, :ppid, :pgid, :winpid, :tty, :uid, :etime, :command, :time).merge(:state => state)
       end
     else
-      read_lines('ps axwwo user,pid,vsz,rss,pcpu,state,etime,time,command').drop(1).map do |line|
-        line_to_hash(line, :user, :pid, :vsz, :rss, :pcpu, :state, :etime, :time, :command)
+      read_lines('ps axwwo user,pid,vsz,rss,pcpu,nlwp,state,etime,time,command').drop(1).map do |line|
+        line_to_hash(line, :user, :pid, :vsz, :rss, :pcpu, :thcount, :state, :etime, :time, :command)
       end
     end
   end
@@ -200,9 +206,10 @@ class CheckProcs < Sensu::Plugin::Check::CLI
     procs.reject! {|p| p[:pid].to_i == $$ } unless config[:match_self]
     procs.reject! {|p| p[:pid].to_i == Process.ppid } unless config[:match_parent]
     procs.reject! {|p| p[:command] !~ /#{config[:cmd_pat]}/ } if config[:cmd_pat]
-    procs.reject! {|p| p[:vsz].to_f < config[:vsz] } if config[:vsz]
-    procs.reject! {|p| p[:rss].to_f < config[:rss] } if config[:rss]
-    procs.reject! {|p| p[:pcpu].to_f < config[:pcpu] } if config[:pcpu]
+    procs.reject! {|p| p[:vsz].to_f > config[:vsz] } if config[:vsz]
+    procs.reject! {|p| p[:rss].to_f > config[:rss] } if config[:rss]
+    procs.reject! {|p| p[:pcpu].to_f > config[:pcpu] } if config[:pcpu]
+    procs.reject! {|p| p[:thcount].to_i > config[:thcount] } if config[:thcount]
     procs.reject! {|p| etime_to_esec(p[:etime]) >= config[:esec_under] } if config[:esec_under]
     procs.reject! {|p| etime_to_esec(p[:etime]) <= config[:esec_over] } if config[:esec_over]
     procs.reject! {|p| cputime_to_csec(p[:time]) >= config[:cpu_under] } if config[:cpu_under]
@@ -214,9 +221,10 @@ class CheckProcs < Sensu::Plugin::Check::CLI
     msg += "; cmd /#{config[:cmd_pat]}/" if config[:cmd_pat]
     msg += "; state #{config[:state].join(',')}" if config[:state]
     msg += "; user #{config[:user].join(',')}" if config[:user]
-    msg += "; vsz > #{config[:vsz]}" if config[:vsz]
-    msg += "; rss > #{config[:rss]}" if config[:rss]
-    msg += "; pcpu > #{config[:pcpu]}" if config[:pcpu]
+    msg += "; vsz < #{config[:vsz]}" if config[:vsz]
+    msg += "; rss < #{config[:rss]}" if config[:rss]
+    msg += "; pcpu < #{config[:pcpu]}" if config[:pcpu]
+    msg += "; thcount < #{config[:thcount]}" if config[:thcount]
     msg += "; esec < #{config[:esec_under]}" if config[:esec_under]
     msg += "; esec > #{config[:esec_over]}" if config[:esec_over]
     msg += "; csec < #{config[:cpu_under]}" if config[:cpu_under]

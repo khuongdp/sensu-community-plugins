@@ -73,6 +73,13 @@ class Mailer < Sensu::Handler
     mail_to
   end
 
+  def filter_repeated
+    super
+    if @event['action'] == 'create' && @event['occurrences'] > @event['check']['occurrences']
+      bail "Only firing on the specified occurrence(#{@event['check']['occurrences']}). We are at ##{@event['occurrences']}"
+    end
+  end
+
   def handle
     json_config = config[:json_config] || 'mailer'
     admin_gui = settings[json_config]['admin_gui'] || 'http://localhost:8080/'

@@ -75,8 +75,9 @@ class Mailer < Sensu::Handler
 
   def filter_repeated
     super
-    if @event['action'] == 'create' && @event['occurrences'] > @event['check']['occurrences']
-      bail "Only firing on the specified occurrence(#{@event['check']['occurrences']}). We are at ##{@event['occurrences']}"
+    occurrences = (@event['check']['occurrences'] || 1).to_i
+    if @event['action'] == 'create' && @event['occurrences'] > occurrences
+      bail "Only firing on the specified occurrence(#{occurrences}). We are at ##{@event['occurrences']}"
     end
   end
 
